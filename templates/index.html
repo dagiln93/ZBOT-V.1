@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Z-Score Trading Bot</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
+        
+        :root {
+            --cyber-purple: #6a5acd;
+            --cyber-blue: #4169e1;
+            --cyber-indigo: #4b0082;
+            --cyber-violet: #9370db;
+            --cyber-navy: #1e3a8a;
+            --dark-bg: #0a0a0a;
+            --card-bg: rgba(15, 10, 30, 0.95);
+        }
+        
+        body {
+            background-image: url('{{ url_for("static", filename="images/background.png") }}');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--cyber-blue);
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, rgba(106, 90, 205, 0.1), rgba(65, 105, 225, 0.1));
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: -1;
+        }
+        
+        .container {
+            background: var(--card-bg);
+            border: 2px solid var(--cyber-purple);
+            border-radius: 0;
+            padding: 2rem;
+            margin-top: 1rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 30px rgba(106, 90, 205, 0.4), inset 0 0 30px rgba(65, 105, 225, 0.2);
+            position: relative;
+        }
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, var(--cyber-purple), var(--cyber-blue), var(--cyber-indigo), var(--cyber-violet));
+            z-index: -1;
+            animation: borderGlow 3s ease-in-out infinite alternate;
+        }
+        
+        @keyframes borderGlow {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Orbitron', monospace;
+            text-shadow: 0 0 10px currentColor;
+            letter-spacing: 2px;
+        }
+        
+        .display-6 {
+            color: var(--cyber-blue);
+            text-transform: uppercase;
+            animation: textGlow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes textGlow {
+            0% { text-shadow: 0 0 10px var(--cyber-blue), 0 0 20px var(--cyber-blue); }
+            100% { text-shadow: 0 0 20px var(--cyber-blue), 0 0 30px var(--cyber-blue), 0 0 40px var(--cyber-blue); }
+        }
+        
+        .btn-analyze {
+            background: linear-gradient(135deg, var(--cyber-purple), var(--cyber-indigo));
+            border: 2px solid var(--cyber-blue);
+            color: white;
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 700;
+            padding: 15px 40px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-analyze::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-analyze:hover::before {
+            left: 100%;
+        }
+        
+        .btn-analyze:hover {
+            box-shadow: 0 0 20px var(--cyber-purple), 0 0 40px var(--cyber-blue);
+            transform: translateY(-2px);
+        }
+        
+        .card {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--cyber-blue) !important;
+            border-radius: 0 !important;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-violet)) !important;
+            border-bottom: 2px solid var(--cyber-purple) !important;
+            color: white !important;
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .table-dark {
+            background: var(--card-bg) !important;
+            color: var(--cyber-blue) !important;
+            border-color: var(--cyber-purple) !important;
+        }
+        
+        .table-dark th {
+            border-color: var(--cyber-purple) !important;
+            color: var(--cyber-blue) !important;
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+        
+        .table-hover tbody tr:hover {
+            background: rgba(0, 255, 255, 0.1) !important;
+        }
+        
+        .signal-long { 
+            color: var(--cyber-violet) !important;
+            text-shadow: 0 0 5px var(--cyber-violet);
+            font-weight: bold;
+        }
+        
+        .signal-short { 
+            color: var(--cyber-indigo) !important;
+            text-shadow: 0 0 5px var(--cyber-indigo);
+            font-weight: bold;
+        }
+        
+        .badge {
+            font-family: 'Orbitron', monospace;
+            border: 1px solid currentColor;
+            text-shadow: 0 0 3px currentColor;
+        }
+        
+        .bg-success {
+            background: var(--cyber-violet) !important;
+            color: white !important;
+        }
+        
+        .bg-warning {
+            background: var(--cyber-purple) !important;
+            color: white !important;
+        }
+        
+        .bg-secondary {
+            background: var(--cyber-navy) !important;
+            color: white !important;
+        }
+        
+        .precision-high { 
+            color: var(--cyber-violet) !important;
+            font-weight: bold;
+            text-shadow: 0 0 3px var(--cyber-violet);
+        }
+        
+        .precision-medium { 
+            color: var(--cyber-blue) !important;
+            text-shadow: 0 0 3px var(--cyber-blue);
+        }
+        
+        .precision-low { 
+            color: var(--cyber-indigo) !important;
+            text-shadow: 0 0 3px var(--cyber-indigo);
+        }
+        
+        .dropdown-menu {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--cyber-blue) !important;
+            border-radius: 0 !important;
+        }
+        
+        .dropdown-item {
+            color: var(--cyber-blue) !important;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .dropdown-item:hover {
+            background: rgba(0, 255, 255, 0.2) !important;
+            color: var(--cyber-pink) !important;
+        }
+        
+        .text-success {
+            color: var(--cyber-green) !important;
+            text-shadow: 0 0 3px var(--cyber-green);
+        }
+        
+        .text-muted {
+            color: rgba(0, 255, 255, 0.7) !important;
+        }
+        
+        .font-monospace {
+            color: var(--cyber-orange) !important;
+            text-shadow: 0 0 2px var(--cyber-orange);
+        }
+        
+        .card-footer {
+            background: var(--card-bg) !important;
+            border-top: 1px solid var(--cyber-purple) !important;
+        }
+        
+        .alert {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--cyber-orange) !important;
+            color: var(--cyber-orange) !important;
+            border-radius: 0 !important;
+        }
+        
+        @media (max-width: 768px) {
+            .container { 
+                padding: 1rem;
+                margin: 0.5rem;
+            }
+            .display-6 {
+                font-size: 2rem;
+            }
+            .btn-analyze {
+                padding: 12px 25px;
+                font-size: 0.9rem;
+            }
+        }
+        
+        /* Glitch effect for title */
+        .glitch {
+            position: relative;
+        }
+        
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .glitch::before {
+            animation: glitch-1 0.5s infinite;
+            color: var(--cyber-pink);
+            z-index: -1;
+        }
+        
+        .glitch::after {
+            animation: glitch-2 0.5s infinite;
+            color: var(--cyber-blue);
+            z-index: -2;
+        }
+        
+        @keyframes glitch-1 {
+            0%, 14%, 15%, 49%, 50%, 99%, 100% {
+                transform: translate(0);
+            }
+            15%, 49% {
+                transform: translate(-2px, 2px);
+            }
+        }
+        
+        @keyframes glitch-2 {
+            0%, 20%, 21%, 62%, 63%, 99%, 100% {
+                transform: translate(0);
+            }
+            21%, 62% {
+                transform: translate(2px, -2px);
+            }
+        }
+        
+        /* Matrix rain effect */
+        .matrix-bg::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 255, 0.03) 2px,
+                rgba(0, 255, 255, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+            animation: matrix-scroll 20s linear infinite;
+        }
+        
+        @keyframes matrix-scroll {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100px); }
+        }
+        
+        /* Pulsing effects */
+        .pulse-pink {
+            animation: pulse-purple 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes pulse-purple {
+            0% { box-shadow: 0 0 5px var(--cyber-purple); }
+            100% { box-shadow: 0 0 15px var(--cyber-purple), 0 0 25px var(--cyber-purple); }
+        }
+        
+        /* Scanner line effect */
+        .scanner::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyber-blue), transparent);
+            animation: scanner 3s ease-in-out infinite;
+        }
+        
+        @keyframes scanner {
+            0%, 100% { transform: translateY(0); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(300px); }
+        }
+        
+        /* Hologram effect for cards */
+        .hologram {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hologram::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(0, 255, 255, 0.1) 50%,
+                transparent 70%
+            );
+            animation: hologram-sweep 4s ease-in-out infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes hologram-sweep {
+            0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+    </style>
+</head>
+<body class="matrix-bg">
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10">
+                <!-- Language Switcher -->
+                <div class="text-end mb-3">
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-globe me-1"></i>
+                            {{ 'RU' if current_lang == 'ru' else 'EN' }}
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('set_language', language='ru') }}">🇷🇺 Русский</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('set_language', language='en') }}">🇺🇸 English</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Header -->
+                <div class="text-center mb-4">
+                    <h1 class="display-6 mb-3">
+                        <i class="fas fa-chart-line me-2"></i>
+                        {{ t.title }}
+                    </h1>
+                    <p class="lead text-muted">{{ t.subtitle }}</p>
+                </div>
+
+                <!-- Analysis Button -->
+                <div class="text-center mb-4">
+                    <form method="post">
+                        <button type="submit" class="btn btn-analyze btn-lg px-5 py-3">
+                            <i class="fas fa-search me-2"></i>
+                            {{ t.run_analysis }}
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else 'info' }} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' }} me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Results Table -->
+                {% if results %}
+                <div class="card border-0 shadow hologram scanner pulse-pink">
+                    <div class="card-header bg-primary">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-trophy me-2"></i>
+                            {{ t.top_signals }}
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th scope="col" class="text-center">#</th>
+                                        <th scope="col">{{ t.symbol }}</th>
+                                        <th scope="col" class="text-center">{{ t.cmc_rank }}</th>
+                                        <th scope="col" class="text-center">{{ t.signal }}</th>
+                                        <th scope="col" class="text-end">{{ t.price }}</th>
+                                        <th scope="col" class="text-center">{{ t.strength }}</th>
+                                        <th scope="col" class="text-center">{{ t.precision }}</th>
+                                        <th scope="col" class="text-center">{{ t.status }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for signal in results %}
+                                    <tr class="{{ 'table-success' if signal.still_valid and signal.precision > 0.6 else '' }}">
+                                        <td class="text-center">
+                                            <span class="badge bg-secondary">{{ loop.index }}</span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ signal.symbol }}</strong>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge {% if signal.cmc_rank <= 10 %}bg-success{% elif signal.cmc_rank <= 25 %}bg-warning{% else %}bg-secondary{% endif %}">
+                                                #{{ signal.cmc_rank }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if signal.direction == 'long' %}
+                                                <span class="signal-long">
+                                                    <i class="fas fa-arrow-up"></i> {{ t.long }}
+                                                </span>
+                                            {% else %}
+                                                <span class="signal-short">
+                                                    <i class="fas fa-arrow-down"></i> {{ t.short }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end font-monospace">
+                                            {{ signal.price }}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-info">
+                                                {{ "%.2f"|format(signal.strength) }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            {% set precision_pct = (signal.precision * 100)|round(1) %}
+                                            <span class="{% if precision_pct >= 70 %}precision-high{% elif precision_pct >= 50 %}precision-medium{% else %}precision-low{% endif %}">
+                                                {{ precision_pct }}%
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if signal.still_valid %}
+                                                <span class="text-success">
+                                                    <i class="fas fa-check-circle"></i> {{ t.active }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">
+                                                    <i class="fas fa-clock"></i> {{ t.expired }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer text-muted text-center">
+                        <small>
+                            <i class="fas fa-info-circle me-1"></i>
+                            {{ t.footer_text }}
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Strategy Info -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-dark hologram">
+                            <div class="card-body">
+                                <h6 class="card-title text-primary">
+                                    <i class="fas fa-cog me-2"></i>{{ t.strategy_params }}
+                                </h6>
+                                <ul class="list-unstyled mb-0 small">
+                                    <li><strong>{{ t.timeframe }}:</strong> 4{{ 'H' if current_lang == 'en' else 'ч' }}</li>
+                                    <li><strong>{{ t.zscore_period }}:</strong> 14</li>
+                                    <li><strong>{{ t.threshold }}:</strong> ±2.0</li>
+                                    <li><strong>{{ t.take_profit }}:</strong> 1.0%</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-dark hologram">
+                            <div class="card-body">
+                                <h6 class="card-title text-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>{{ t.risk_warning }}
+                                </h6>
+                                <p class="small mb-0">
+                                    {{ t.risk_text }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% else %}
+                <!-- No Results -->
+                <div class="text-center py-5">
+                    <div class="card border-0 bg-dark hologram pulse-pink">
+                        <div class="card-body">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">{{ t.ready_title }}</h5>
+                            <p class="text-muted">{{ t.ready_text }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

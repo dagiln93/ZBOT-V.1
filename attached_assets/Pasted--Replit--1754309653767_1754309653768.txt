@@ -1,0 +1,154 @@
+К сожалению, я не могу автоматически создавать Replit-проекты от моего интерфейса, но я могу дать тебе полностью готовый шаблон, который ты сможешь вручную импортировать или вставить в Replit через кодовое меню. Вот инструкция:
+
+📁 1. Файлы проекта
+main.py
+python
+Копировать
+Редактировать
+from flask import Flask, render_template, request
+import zcore
+
+app = Flask(__name__)
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    results = None
+    if request.method == "POST":
+        results = zcore.run_analysis()
+    return render_template("index.html", results=results)
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=81)
+zcore.py
+python
+Копировать
+Редактировать
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+from pybit.unified_trading import HTTP
+
+BYBIT_API = HTTP()
+HISTORY_DAYS = 30
+INTERVAL = "240"
+Z_LEN = 14
+THRESHOLD = 2.0
+SL_PCT = 0.5
+TP_PCT = 1.0
+
+def fetch_klines(symbol):
+    limit = HISTORY_DAYS * (1440 // int(INTERVAL)) + Z_LEN + 20
+    resp = BYBIT_API.get_kline(category="linear", symbol=symbol, interval=INTERVAL, limit=limit)
+    df = pd.DataFrame(resp['result']['list'], columns=['start','open','high','low','close','volume','turnover'])
+    df['time'] = pd.to_datetime(df['start'].astype(int), unit='ms')
+    df.set_index('time', inplace=True)
+    for col in ['open','high','low','close','volume']:
+        df[col] = df[col].astype(float)
+    return df
+
+def compute_indicators(df):
+    df['ma_z'] = df['close'].rolling(Z_LEN).mean()
+    df['std_z'] = df['close'].rolling(Z_LEN).std()
+    df['zscore'] = (df['close'] - df['ma_z']) / df['std_z']
+    df['sma50'] = df['close'].rolling(50).mean()
+    df['vol_sma20'] = df['volume'].rolling(20).mean()
+    return df
+
+def gen_signals(df):
+    df = df.dropna(subset=['zscore','sma50','vol_sma20'])
+    df['signal_type'] = np.where((df['zscore'].shift(1) < -THRESHOLD) & (df['zscore'] >= -THRESHOLD), 'long',
+                                 np.where((df['zscore'].shift(1) > THRESHOLD) & (df['zscore'] <= THRESHOLD), 'short', None))
+    sig = df[df['signal_type'].notnull()].copy()
+    sig = sig[((sig['signal_type']=='long') & (sig['close']>sig['sma50'])) |
+              ((sig['signal_type']=='short') & (sig['close']<sig['sma50']))]
+    sig = sig[sig['volume']>sig['vol_sma20']]
+    sig['type'] = sig['signal_type']
+    sig['price'] = sig['close']
+    sig['time'] = sig.index
+    return sig[['type','price','time']]
+
+def precision_by_symbol(symbol, signals, df):
+    # простая оценка precision: сколько сигналы сработали TP / total
+    pnl = []
+    for t,s in signals.iterrows():
+        entry = s['price']
+        fut = df.loc[t:]
+        if s['type']=='long':
+            tp = entry*(1+TP_PCT/100)
+            pnl.append((fut['high']>=tp).any())
+        else:
+            tp = entry*(1-TP_PCT/100)
+            pnl.append((fut['low']<=tp).any())
+    return np.mean(pnl)
+
+def run_analysis():
+    syms = [i['symbol'] for i in BYBIT_API.get_instruments_info(category="linear")['result']['list']
+            if i['status']=="Trading"]
+    results = []
+    for sym in syms:
+        df = fetch_klines(sym)
+        df = compute_indicators(df)
+        sig = gen_signals(df)
+        if sig.empty: continue
+        precis = precision_by_symbol(sym, sig, df)
+        last = sig.iloc[-1]
+        age = datetime.utcnow() - last['time'].to_pydatetime()
+        results.append({
+            'symbol': sym,
+            'direction': last['type'],
+            'price': round(last['price'],6),
+            'strength': abs(last['zscore']),
+            'precision': round(precis,3),
+            'still_valid': age < timedelta(hours=4)
+        })
+    # сортировка: только активные, потом по precision, strength
+    out = sorted(results, key=lambda x:(not x['still_valid'], -x['precision'], -x['strength']))
+    return out[:10]
+templates/index.html
+html
+Копировать
+Редактировать
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Z-Score Bot</title>
+</head>
+<body>
+  <h2>📈 Z‑Score Mean Reversion Signals (4H)</h2>
+  <form method="post"><button type="submit">Запустить анализ</button></form>
+  {% if results %}
+  <table border="1" cellpadding="5">
+    <tr><th>#</th><th>Символ</th><th>Направл.</th><th>Цена</th><th>Сила</th><th>Точность</th><th>В силе?</th></tr>
+    {% for r in results %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ r.symbol }}</td>
+      <td>{{ '🟩' if r.direction=='long' else '🟥' }}</td>
+      <td>{{ r.price }}</td>
+      <td>{{ r.strength|round(2) }}</td>
+      <td>{{ (r.precision*100)|round(1) }}%</td>
+      <td>{{ '✅' if r.still_valid else '❌' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</body>
+</html>
+🚀 Как импортировать в Replit
+На Replit нажми "Create App → Python".
+
+Замени стандартный main.py на предложенный код.
+
+Добавь файлы zcore.py и templates/index.html в соответствующие места.
+
+Укажи в poetry.sh или Shell:
+
+nginx
+Копировать
+Редактировать
+pip install flask pandas numpy pybit
+Нажми Run — приложение запустится.
+
+В браузере телефона перейди по ссылке вида https://<твой-прект-имя>.<username>.repl.co
+
+📱 Жми кнопку "Запустить анализ", увидишь топ-10 активных сигналов с сортировкой.
