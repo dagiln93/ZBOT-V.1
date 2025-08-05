@@ -1,0 +1,2 @@
+# This is a placeholder lock file to ensure Render/Poetry installs flask-cors.
+# You should regenerate this file locally with 'poetry update' for production use.
