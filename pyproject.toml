@@ -13,4 +13,5 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "pybit>=5.11.0",
     "requests>=2.32.4",
+    "flask-cors>=4.0.0",
 ]
