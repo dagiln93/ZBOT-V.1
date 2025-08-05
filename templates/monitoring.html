@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t('title') }} - {{ t('monitoring') }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-card {
+            transition: all 0.3s ease;
+        }
+        .status-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .health-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .health-good { background-color: #28a745; }
+        .health-warning { background-color: #ffc107; }
+        .health-error { background-color: #dc3545; }
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .refresh-btn {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .refresh-btn:hover {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line me-2"></i>{{ t('title') }}
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">{{ t('home') }}</a>
+                <a class="nav-link" href="/history">{{ t('history') }}</a>
+                <a class="nav-link active" href="/monitoring">{{ t('monitoring') }}</a>
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-globe"></i>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/set_language/en">English</a></li>
+                        <li><a class="dropdown-item" href="/set_language/ru">Русский</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="fas fa-tachometer-alt me-2"></i>{{ t('system_monitoring') }}</h2>
+                    <button class="btn btn-primary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt refresh-btn"></i> {{ t('refresh') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Системное здоровье -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-heartbeat me-2"></i>{{ t('system_health') }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="healthStatus">
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center">
+                                    <span class="health-indicator health-good" id="apiHealth"></span>
+                                    <span>{{ t('api_connectivity') }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center">
+                                    <span class="health-indicator health-good" id="dbHealth"></span>
+                                    <span>{{ t('database_connectivity') }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center">
+                                    <span class="health-indicator health-good" id="analysisHealth"></span>
+                                    <span>{{ t('analysis_performance') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Метрики производительности -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>{{ t('performance_metrics') }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="performanceMetrics">
+                            <!-- Метрики будут загружены динамически -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статистика кэша -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-database me-2"></i>{{ t('cache_statistics') }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="cacheStats">
+                            <!-- Статистика кэша будет загружена динамически -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Последние алерты -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>{{ t('recent_alerts') }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="alertsList">
+                            <!-- Алерты будут загружены динамически -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function refreshData() {
+            // Показываем индикатор загрузки
+            document.querySelector('.refresh-btn').style.transform = 'rotate(360deg)';
+            
+            // Загружаем данные мониторинга
+            fetch('/api/v1/monitoring/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateHealthStatus(data.status.health_status);
+                        updatePerformanceMetrics(data.status.performance_metrics);
+                        updateCacheStats(data.status.cache_stats);
+                        updateAlerts(data.status.health_status.alerts);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading monitoring data:', error);
+                })
+                .finally(() => {
+                    // Сбрасываем анимацию
+                    setTimeout(() => {
+                        document.querySelector('.refresh-btn').style.transform = 'rotate(0deg)';
+                    }, 500);
+                });
+        }
+
+        function updateHealthStatus(healthStatus) {
+            const status = healthStatus.status;
+            const overallHealth = healthStatus.overall_health;
+            
+            // Обновляем индикаторы здоровья
+            document.getElementById('apiHealth').className = 
+                `health-indicator ${status.api_connectivity ? 'health-good' : 'health-error'}`;
+            document.getElementById('dbHealth').className = 
+                `health-indicator ${status.database_connectivity ? 'health-good' : 'health-error'}`;
+            document.getElementById('analysisHealth').className = 
+                `health-indicator ${status.analysis_performance ? 'health-good' : 'health-error'}`;
+        }
+
+        function updatePerformanceMetrics(metrics) {
+            const container = document.getElementById('performanceMetrics');
+            container.innerHTML = '';
+            
+            Object.entries(metrics).forEach(([operation, metric]) => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4 mb-3';
+                
+                const successRate = metric.success_rate;
+                const statusClass = successRate >= 95 ? 'text-success' : 
+                                  successRate >= 80 ? 'text-warning' : 'text-danger';
+                
+                col.innerHTML = `
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-title">${operation}</h6>
+                            <div class="metric-value ${statusClass}">${successRate}%</div>
+                            <small class="text-muted">
+                                ${metric.count} executions | ${metric.avg_time}s avg
+                            </small>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+        }
+
+        function updateCacheStats(stats) {
+            const container = document.getElementById('cacheStats');
+            container.innerHTML = `
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="metric-value text-primary">${stats.total_entries}</div>
+                        <small class="text-muted">{{ t('total_entries') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="metric-value text-warning">${stats.expired_entries}</div>
+                        <small class="text-muted">{{ t('expired_entries') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="metric-value text-info">${Math.round(stats.memory_usage / 1024)} KB</div>
+                        <small class="text-muted">{{ t('memory_usage') }}</small>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateAlerts(alerts) {
+            const container = document.getElementById('alertsList');
+            
+            if (alerts.length === 0) {
+                container.innerHTML = '<p class="text-muted">{{ t('no_alerts') }}</p>';
+                return;
+            }
+            
+            container.innerHTML = alerts.map(alert => `
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <strong>${alert.type}:</strong> ${alert.message}
+                    <small class="d-block text-muted">${new Date(alert.timestamp).toLocaleString()}</small>
+                </div>
+            `).join('');
+        }
+
+        // Загружаем данные при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            
+            // Обновляем данные каждые 30 секунд
+            setInterval(refreshData, 30000);
+        });
+    </script>
+</body>
+</html> 

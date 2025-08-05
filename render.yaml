@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: barashor-trading-system
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.16
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///barashor_trading.db
+      - key: BYBIT_API_KEY
+        value: ""
+      - key: BYBIT_SECRET_KEY
+        value: ""
+      - key: COINGECKO_API_KEY
+        value: "" 
